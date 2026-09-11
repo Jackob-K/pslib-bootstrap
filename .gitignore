@@ -1,0 +1,12 @@
+.DS_Store
+*.log
+*.tmp
+*.temp
+.env
+.env.*
+*.key
+*.pem
+*token*
+*credentials*
+credentials/
+secrets/
