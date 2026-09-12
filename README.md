@@ -31,5 +31,22 @@ Without that manual GitHub step, the bootstrap cannot access the private reposit
 6. Prepares `/srv/pslib-vyuka`.
 7. Clones or updates the private repository in `/srv/pslib-vyuka/repo`.
 8. Runs `/srv/pslib-vyuka/repo/web/server/install.sh`.
+9. Checks that deploy scripts are executable and that `shared/pnpm-store` exists.
 
 It does not change DNS, Apache, cloudflared routing, redirects, or the production web symlink.
+
+## After Bootstrap
+
+Run the first deploy manually:
+
+```bash
+BUILD_RUNTIME=docker /srv/pslib-vyuka/shared/deploy.sh
+```
+
+Useful sanity checks:
+
+```bash
+git -C /srv/pslib-vyuka/repo status --short
+test -x /srv/pslib-vyuka/shared/deploy.sh
+test -d /srv/pslib-vyuka/shared/pnpm-store
+```

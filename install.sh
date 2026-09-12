@@ -47,6 +47,49 @@ run_privileged() {
   fi
 }
 
+have_sudo() {
+  have sudo
+}
+
+path_owner_uid() {
+  if stat -c '%u' "$1" >/dev/null 2>&1; then
+    stat -c '%u' "$1"
+  else
+    stat -f '%u' "$1"
+  fi
+}
+
+ensure_owned_by_current_user() {
+  local target="$1"
+  local uid gid owner
+
+  [ -e "$target" ] || return 0
+
+  uid="$(id -u)"
+  gid="$(id -g)"
+  owner="$(path_owner_uid "$target")"
+
+  if [ "$owner" = "$uid" ]; then
+    return 0
+  fi
+
+  if [ "$(id -u)" -eq 0 ]; then
+    chown -R "$uid:$gid" "$target"
+  elif have_sudo; then
+    sudo chown -R "$uid:$gid" "$target"
+  else
+    fail "$target is not owned by the current user and sudo is not available."
+  fi
+}
+
+ensure_app_tree_ownership() {
+  ensure_owned_by_current_user "$BASE_DIR"
+  ensure_owned_by_current_user "$BASE_DIR/repo"
+  ensure_owned_by_current_user "$BASE_DIR/releases"
+  ensure_owned_by_current_user "$BASE_DIR/shared"
+  ensure_owned_by_current_user "$BASE_DIR/logs"
+}
+
 ssh_git() {
   GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git "$@"
 }
@@ -99,7 +142,7 @@ fi
 
 say "Preparing $BASE_DIR"
 run_privileged mkdir -p "$BASE_DIR/repo" "$BASE_DIR/releases" "$BASE_DIR/shared" "$BASE_DIR/logs"
-run_privileged chown -R "$(id -u):$(id -g)" "$BASE_DIR/repo" "$BASE_DIR/releases" "$BASE_DIR/shared" "$BASE_DIR/logs"
+ensure_app_tree_ownership
 
 if [ ! -d "$BASE_DIR/repo/.git" ]; then
   say "Cloning private repository"
@@ -114,6 +157,17 @@ fi
 
 say "Running internal installer from private repository"
 bash "$BASE_DIR/repo/web/server/install.sh"
+ensure_app_tree_ownership
+
+say "Sanity check"
+git -C "$BASE_DIR/repo" status --short
+test -x "$BASE_DIR/shared/deploy.sh"
+mkdir -p "$BASE_DIR/shared/pnpm-store"
+ensure_owned_by_current_user "$BASE_DIR/shared/pnpm-store"
+test -d "$BASE_DIR/shared/pnpm-store"
 
 say "Bootstrap finished"
 echo "No DNS, Apache, cloudflared routing, production symlink, or deploy was changed by this public bootstrap."
+echo
+echo "Next deploy command:"
+echo "  BUILD_RUNTIME=docker $BASE_DIR/shared/deploy.sh"
