@@ -43,10 +43,35 @@ Run the first deploy manually:
 BUILD_RUNTIME=docker /srv/pslib-vyuka/shared/deploy.sh
 ```
 
+## GitHub Actions Deploy Hook
+
+The bootstrap can also prepare a minimal SSH deploy entrypoint for GitHub Actions:
+
+```bash
+APP_OWNER=jakub DEPLOY_USER=github-deploy SETUP_GITHUB_DEPLOY=1 bash install.sh
+```
+
+On a new server with a dedicated service user, set `APP_OWNER` to that user instead.
+
+This creates:
+
+- `/usr/local/sbin/deploy-pslib`, owned by `root:root` and not writable by `github-deploy`,
+- `/etc/sudoers.d/github-deploy-pslib`, allowing `github-deploy` to run only that wrapper as `APP_OWNER`.
+
+It does not add `github-deploy` to the `docker` group and does not grant `NOPASSWD: ALL`.
+
+GitHub Actions should run only:
+
+```bash
+sudo -n -u "$APP_OWNER" /usr/local/sbin/deploy-pslib
+```
+
 Useful sanity checks:
 
 ```bash
 git -C /srv/pslib-vyuka/repo status --short
 test -x /srv/pslib-vyuka/shared/deploy.sh
 test -d /srv/pslib-vyuka/shared/pnpm-store
+sudo visudo -cf /etc/sudoers.d/github-deploy-pslib
+sudo -l -U github-deploy
 ```
